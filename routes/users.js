@@ -7,7 +7,7 @@ const jwt = require("jsonwebtoken");
 const verifyToken = require("../middleware/token.middleware");
 
 /* GET users listing. */
-router.get("/",verifyToken, async function (req, res, next) {
+router.get("/",/*verifyToken,*/ async function (req, res, next) {
   try {
     let users = await userSchema.find({});
     return res.status(200).send({
@@ -116,25 +116,23 @@ router.put("/:id", async function (req, res, next) {
 router.delete("/:id", async function (req, res, next) {
   try {
     let { id } = req.params;
-    let user = await userSchema.findOne({ user_id: `${id}` });
+    let user = await userSchema.findOne({ user_id: id });
     if (!user) {
       return res.status(404).send({
         success: false,
         message: "user not found.",
-        error: error,
+        error: "id not found",
       });
     }
-    await userSchema.findOneAndDelete({ user_id: `${id}` });
+    await userSchema.findOneAndDelete({ user_id: id });
     return res.status(200).send({
       success: true,
       message: "delete success.",
-      error: error,
     });
   } catch (error) {
     return res.status(500).send({
       success: false,
       message: "internal sever error.",
-      error: error,
     });
   }
 });

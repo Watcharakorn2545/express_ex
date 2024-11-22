@@ -2,13 +2,21 @@ var express = require("express");
 var router = express.Router();
 var orderSchema = require("../models/order.model");
 var productSchema = require("../models/product.model");
-const jwt = require("jsonwebtoken");
-const tokenMiddleware = require("../middleware/token.middleware");
 
 /* GET orders listing. */
 router.get("/", async function (req, res, next) {
   try {
-    let orders = await orderSchema.find({});
+    let {buyer_name} = req.query;
+    let orders;
+    if (buyer_name) {
+      orders = await orderSchema.find({buyer_name:buyer_name})
+      return res.status(200).send({
+        success: true,
+        message: "get success.",
+        data: orders
+      });
+    }
+    orders = await orderSchema.find({});
     return res.status(200).send({
       success: true,
       message: "get success.",
@@ -26,15 +34,7 @@ router.get("/", async function (req, res, next) {
 router.get("/:id", async function (req, res, next) {
   try {
     let { id } = req.params;
-    let order;
-    if (typeof id === "string") {
-      order = await orderSchema.findOne({
-        buyer_name: { $regex: new RegExp(id, "i") },
-      });
-    }
-    if (typeof id === "number") {
-      order = await orderSchema.findOne({ order_id: id });
-    }
+    let order = await orderSchema.findOne({order_id: id});
     if (!order) {
       return res.status(404).send({
         success: false,
@@ -56,11 +56,19 @@ router.get("/:id", async function (req, res, next) {
   }
 });
 
-router.post("/", tokenMiddleware, async function (req, res, next) {
+router.post("/", async function (req, res, next) {
   try {
     //declear variables
     let { order_id, buyer_name, products, total_price } = req.body;
-
+    if (products<=0) {
+      return res
+        .status(400)
+        .send({
+          success: false,
+          message: "bad request.",
+          error: "products must not empty.",
+        });
+    }
     let order = new orderSchema({
       order_id: order_id,
       buyer_name: buyer_name,
@@ -70,8 +78,8 @@ router.post("/", tokenMiddleware, async function (req, res, next) {
     let out_of_stock = [];
     let product_have_stock = [];
     let product_remain = [];
-    let error_amount_number=[];
-    let error_product_name=[];
+    let error_amount_number = [];
+    let error_product_name = [];
 
     //find and save remember product stock
     for (let i = 0; i < order.products.length; i++) {
@@ -80,13 +88,16 @@ router.post("/", tokenMiddleware, async function (req, res, next) {
         error_amount_number.push(products[i].amount);
         error_product_name.push(products[i].name);
       }
+      console.log("product name==>",products[i].name);
+      
       let product = await productSchema.findOne({ name: products[i].name });
+      console.log("product ==>", product);
       let product_name;
-      if (!product) {
+      if (product===null) {
         return res.status(404).send({
           success: false,
           message: "id not found.",
-          error: `id:${id}`,
+          error: `name:${products[i].name}`,
         });
       }
       if (product.remain >= products[i].amount) {
@@ -98,12 +109,14 @@ router.post("/", tokenMiddleware, async function (req, res, next) {
         out_of_stock.push(product_name);
       }
     }
-    if (error_amount_number.length > 0 && error_product_name.length >0) {
+    if (error_amount_number.length > 0 && error_product_name.length > 0) {
       return res.status(400).send({
         success: false,
         message: "bad request",
-        error: error_product_name.map((item,index)=>`${item}:${error_amount_number[index]}`)
-      })
+        error: error_product_name.map(
+          (item, index) => `${item}:${error_amount_number[index]}`
+        ),
+      });
     }
     if (out_of_stock.length > 0) {
       return res.status(400).send({
@@ -120,11 +133,9 @@ router.post("/", tokenMiddleware, async function (req, res, next) {
         );
       }
       await order.save();
-      let token = await jwt.sign({ foo: "bar" }, "1234");
       return res.status(201).send({
         success: true,
         message: "create success.",
-        token: token,
         data: order,
       });
     }

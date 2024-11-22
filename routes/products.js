@@ -47,7 +47,7 @@ router.get("/:id", async function (req, res, next) {
   }
 });
 
-router.post("/", tokenMiddleware, async function (req, res, next) {
+router.post("/", /*tokenMiddleware,*/ async function (req, res, next) {
   try {
     let { product_id, name, detail, price, remain } = req.body;
     let product = new productSchema({
@@ -66,7 +66,7 @@ router.post("/", tokenMiddleware, async function (req, res, next) {
       });
     }
     await product.save();
-    let token = await jwt.sign({ foo: "bar" }, "1234");
+    // let token = await jwt.sign({ foo: "bar" }, "1234");
     return res.status(201).send({
       success: true,
       message: "create success.",
