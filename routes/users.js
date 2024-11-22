@@ -4,10 +4,10 @@ var userSchema = require("../models/user.model");
 // const multer = require("multer");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-// const tokenMiddleware = require("../middleware/token.middleware");
+const verifyToken = require("../middleware/token.middleware");
 
 /* GET users listing. */
-router.get("/", async function (req, res, next) {
+router.get("/",verifyToken, async function (req, res, next) {
   try {
     let users = await userSchema.find({});
     return res.status(200).send({

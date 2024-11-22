@@ -2,19 +2,23 @@ const jwt = require("jsonwebtoken");
 
 module.exports = (req, res, next) => {
   try {
-    const token = req.headers.authorizetion;
-    // const decoded = jwt.decode(token, process.env.JWT_KEY);
-    if (token)
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer "))
       return res.status(401).send({
         success: false,
         message: "token invalid.",
       });
-    req.auth = token;
+    const token = authHeader.replace("Bearer ", "");
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_KEY //|| "default_secret_key"
+    );
+    req.auth = decoded;
     next();
   } catch (error) {
-    return res.status(500).send({
+    return res.status(401).send({
       success: false,
-      message: "internal sever error.",
+      message: "auth failed.",
       error: error,
     });
   }

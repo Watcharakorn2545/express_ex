@@ -2,6 +2,7 @@ var express = require("express");
 var router = express.Router();
 const bcrypt = require("bcrypt");
 var userSchema = require("../models/user.model");
+// var jwt = require("../middleware/token.middleware");
 
 router.get("/", async function (req, res, next) {
   try {

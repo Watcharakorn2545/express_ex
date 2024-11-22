@@ -2,16 +2,13 @@ var express = require("express");
 var router = express.Router();
 const bcrypt = require("bcrypt");
 var userSchema = require("../models/user.model");
-
-/* GET home page. */
-// router.get('/', function(req, res, next) {
-//   res.render('index', { title: 'Express' });
-// });
+const jwt = require("jsonwebtoken");
 
 router.get("/login", async function (req, res, next) {
   try {
     let { username, password } = req.query;
     let user = await userSchema.findOne({ username: username });
+
     if (!user) {
       return res.status(404).send({
         success: false,
@@ -21,10 +18,22 @@ router.get("/login", async function (req, res, next) {
     }
     let auth_bool = await bcrypt.compare(password, user.password);
     if (auth_bool) {
+      const tokenPayload = {
+        id: user._id,
+        username: user.username,
+      };
+      const token = jwt.sign(
+        tokenPayload,
+        process.env.JWT_KEY //|| "default_secret_key",
+        ,{
+          expiresIn: "24h", // Token expires in 1 hour
+        }
+      );
       return res.status(202).send({
         success: true,
         message: "authorizetion.",
         data: user,
+        token: token,
       });
     } else {
       return res.status(401).send({
@@ -41,4 +50,5 @@ router.get("/login", async function (req, res, next) {
     });
   }
 });
+
 module.exports = router;
