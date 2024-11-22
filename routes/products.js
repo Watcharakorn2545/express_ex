@@ -57,6 +57,14 @@ router.post("/", tokenMiddleware, async function (req, res, next) {
       price: price,
       remain: remain,
     });
+    if (price < 0 || remain < 0) {
+      return res.status(400).send({
+        success: false,
+        message: "bad request",
+        error: "price and remain must greater than zero.",
+        data: req.body,
+      });
+    }
     await product.save();
     let token = await jwt.sign({ foo: "bar" }, "1234");
     return res.status(201).send({
@@ -77,6 +85,14 @@ router.put("/:id", async function (req, res, next) {
   try {
     let { product_id, name, detail, price, remain } = req.body;
     let { id } = req.params;
+    if (price < 0 || remain < 0) {
+      return res.status(400).send({
+        success: false,
+        message: "bad request",
+        error: "price and remain must greater than zero.",
+        data: req.body,
+      });
+    }
     let product = await productSchema.findOne({ product_id: id });
     if (!product) {
       return res.status(404).send({

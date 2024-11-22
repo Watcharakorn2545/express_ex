@@ -3,8 +3,8 @@ const {Schema} = mongoose;
 const AutoIncrement = require("mongoose-sequence")(mongoose);
 
 const productSchema = new Schema({
-    product_id: {type: Number,},
-    name:{type: String,},
+    product_id: {type: Number,unique:true,require:true,dropDups:true},
+    name:{type: String,unique:true,require:true,dropDups:true},
     detail: {type: String,},
     price: {type: Number},
     remain: {type: Number,},

@@ -3,8 +3,8 @@ const {Schema} = mongoose;
 const AutoIncrement = require("mongoose-sequence")(mongoose);
 
 const userSchema = new Schema({
-    user_id: {type: Number,},
-    username:{type: String,},
+    user_id: {type: Number,unique:true,require:true,dropDups:true},
+    username:{type: String,unique:true,require:true,dropDups:true},
     password: {type: String,},
     firstname: {type: String},
     lastname: {type: String},
