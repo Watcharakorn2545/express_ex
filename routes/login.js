@@ -1,8 +1,8 @@
-var express = require("express");
-var router = express.Router();
+const express = require("express");
+const router = express.Router();
 const bcrypt = require("bcrypt");
-var userSchema = require("../models/user.model");
-// var jwt = require("../middleware/token.middleware");
+const userSchema = require("../models/user.model");
+const jwt = require("jsonwebtoken");
 
 router.get("/", async function (req, res, next) {
   try {
@@ -15,12 +15,14 @@ router.get("/", async function (req, res, next) {
         error: `username:${username}`,
       });
     }
-    let auth_bool = await bcrypt.compare(password, user.password);
+    let auth_bool = bcrypt.compare(password, user.password);
     if (auth_bool) {
+      let token = jwt.sign({ id:user._id,username: user.username,role:user.role }, process.env.JWT_KEY);
       return res.status(202).send({
         success: true,
         message: "authorizetion.",
         data: user,
+        token: token,
       });
     } else {
       return res.status(401).send({

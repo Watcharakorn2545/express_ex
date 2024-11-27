@@ -1,29 +1,58 @@
-var express = require("express");
-var router = express.Router();
-var orderSchema = require("../models/order.model");
-var productSchema = require("../models/product.model");
+const express = require("express");
+const router = express.Router();
+const orderSchema = require("../models/order.model");
+const productSchema = require("../models/product.model");
+const storeSchema = require("../models/store.model");
+const verifyToken = require("../middleware/token.middleware");
+const userSchema = require("../models/user.model");
 
 /* GET orders listing. */
-router.get("/", async function (req, res, next) {
+router.get("/customer/:customerid", verifyToken, async function (req, res, next) {
   try {
-    let {buyer_name} = req.query;
-    let orders;
-    if (buyer_name) {
-      orders = await orderSchema.find({buyer_name:buyer_name})
+    let {customerid} = req.params;
+    
+    // Add ID validation
+    if (!customerid || !customerid.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).send({
+        success: false,
+        message: "Invalid ID format",
+        error: `customerid:${customerid}`
+      });
+    }
+
+    let token = req.user;
+    if(token.id !== customerid || token.role !== 'admin'){ //check user
+      return res.status(403).send({
+        success: false,
+        message: "forbidden",
+        error: "user not match.",
+      });
+    }
+    let customer = await userSchema.findById(customerid);
+    if(!customer){ //check user exist
+      return res.status(404).send({
+        success: false,
+        message: "user not found.",
+        error: `id:${customerid}`,
+      });
+    }
+    let orders = await orderSchema.find({ //get all orders by customer id
+      customer_id: { $regex: customerid, $options: "i" },
+    });
+    if (!orders) { //check empty result
       return res.status(200).send({
         success: true,
         message: "get success.",
-        data: orders
+        data: [],
       });
     }
-    orders = await orderSchema.find({});
-    return res.status(200).send({
+    return res.status(200).send({ ///get success
       success: true,
       message: "get success.",
       data: orders,
     });
   } catch (error) {
-    return res.status(500).send({
+    return res.status(500).send({ //error handling
       success: false,
       message: "internal sever error.",
       error: error,
@@ -31,24 +60,82 @@ router.get("/", async function (req, res, next) {
   }
 });
 
-router.get("/:id", async function (req, res, next) {
+router.get("/",verifyToken, async function (req, res, next) { // get all orders ; admin
   try {
-    let { id } = req.params;
-    let order = await orderSchema.findOne({order_id: id});
-    if (!order) {
-      return res.status(404).send({
+    let token = req.user;
+    if(token.role !== 'admin'){ //check role
+      return res.status(403).send({
         success: false,
-        message: "id not found.",
-        error: `id:${id}`,
+        message: "forbidden",
+        error: "user not match.",
       });
     }
-    return res.status(200).send({
+    let admin = await userSchema.findById(token.id);
+    if(!admin){ //check user exist
+      return res.status(404).send({
+        success: false,
+        message: "user not found.",
+        error: `id:${token.id}`,
+      });
+    }
+    let orders = await orderSchema.find({});//get all orders by customer id
+    if (!orders) { //check empty result
+      return res.status(200).send({
+        success: true,
+        message: "get success.",
+        data: [],
+      });
+    }
+    return res.status(200).send({ ///get success
+      success: true,
+      message: "get success.",
+      data: orders,
+    });
+  } catch (error) {
+    return res.status(500).send({ //error handling
+      success: false,
+      message: "internal sever error.",
+      error: error,
+    });
+  }
+});
+
+router.get("/customer/name",verifyToken, async function (req, res, next) { // search orders by customer name
+  try {
+    let { customername } = req.query;
+    let token = req.user;
+    if(token.role !== 'admin'){ //check role
+      return res.status(403).send({
+        success: false,
+        message: "forbidden",
+        error: "not perrmission.",
+      });
+    }
+    let admin = await userSchema.findById(token.id);
+    if(!admin){ //check user exist
+      return res.status(404).send({
+        success: false,
+        message: "user not found.",
+        error: `id:${token.id}`,
+      });
+    }
+    let orders = await orderSchema.findOne({ //get all orders by customer name
+      owner_name: { $regex: customername, $options: "i" } 
+    });
+    if (!orders) {
+      return res.status(404).send({ //check exist order
+        success: false,
+        message: "order not found.",
+        error: `customer name:${customername}`,
+      });
+    }
+    return res.status(200).send({ //get success
       success: true,
       message: "get success.",
       data: order,
     });
   } catch (error) {
-    return res.status(500).send({
+    return res.status(500).send({ //error handling
       success: false,
       message: "internal sever error.",
       error: error,
@@ -56,11 +143,28 @@ router.get("/:id", async function (req, res, next) {
   }
 });
 
-router.post("/", async function (req, res, next) {
+router.post("/new", verifyToken, async function (req, res, next) {
   try {
-    //declear variables
-    let { order_id, buyer_name, products, total_price } = req.body;
-    if (products<=0) {
+    let token = req.user;
+    let { customer_id, customer_name, storeObj, products } = req.body;
+
+    // Add ID validation
+    if (!customer_id || !customer_id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).send({
+        success: false,
+        message: "Invalid ID format",
+        error: `customer_id:${customer_id}`
+      });
+    }
+
+    if(token.id !== customer_id){
+      return res.status(403).send({ //check user
+        success: false,
+        message: "forbidden",
+        error: "permission denied.",
+      });
+    }
+    if (products<=0) { //check product amount error
       return res
         .status(400)
         .send({
@@ -69,43 +173,36 @@ router.post("/", async function (req, res, next) {
           error: "products must not empty.",
         });
     }
-    let order = new orderSchema({
-      order_id: order_id,
-      buyer_name: buyer_name,
-      products: products,
-      total_price: total_price,
-    });
     let out_of_stock = [];
     let product_have_stock = [];
+    let product_amounts = [];
     let product_remain = [];
     let error_amount_number = [];
     let error_product_name = [];
-
+    
     //find and save remember product stock
     for (let i = 0; i < order.products.length; i++) {
       //check amount format
       if (products[i].amount < 1) {
         error_amount_number.push(products[i].amount);
-        error_product_name.push(products[i].name);
+        error_product_name.push(products[i].product_name);
       }
-      console.log("product name==>",products[i].name);
-      
-      let product = await productSchema.findOne({ name: products[i].name });
-      console.log("product ==>", product);
+      let product = await productSchema.findById(products[i]._id);
       let product_name;
-      if (product===null) {
+      if (!product) {
         return res.status(404).send({
           success: false,
           message: "id not found.",
-          error: `name:${products[i].name}`,
+          error: `id:${products[i]._id}`,
         });
       }
-      if (product.remain >= products[i].amount) {
-        product_remain.push(product.remain - products[i].amount);
-        product_name = product.product_id;
+      if (product.stock >= products[i].amount) {
+        product_amounts.push(products[i].amount);
+        product_remain.push(product.stock - products[i].amount);
+        product_name = product._id;
         product_have_stock.push(product_name);
       } else {
-        product_name = products[i].name;
+        product_name = products[i].product_name;
         out_of_stock.push(product_name);
       }
     }
@@ -118,6 +215,7 @@ router.post("/", async function (req, res, next) {
         ),
       });
     }
+    let total_price = 0;
     if (out_of_stock.length > 0) {
       return res.status(400).send({
         success: false,
@@ -126,12 +224,20 @@ router.post("/", async function (req, res, next) {
       });
     } else {
       for (let index in product_have_stock) {
-        await productSchema.findOneAndUpdate(
-          { product_id: product_have_stock[index] },
+        let updateAmount = await productSchema.findByIdAndUpdate(
+          product_have_stock[index],
           { remain: product_remain[index] },
           { new: true }
         );
+        total_price += updateAmount.price * product_amounts[index];
       }
+      let order = new orderSchema({
+        customer_id: customer_id,
+        customer_name: customer_name,
+        storeObj: storeObj,
+        products: products,
+        total_price: total_price,
+      });
       await order.save();
       return res.status(201).send({
         success: true,
@@ -148,40 +254,54 @@ router.post("/", async function (req, res, next) {
   }
 });
 
-router.delete("/:id", async function (req, res, next) {
+router.delete("/cancle", verifyToken, async function (req, res, next) {
   try {
-    //declear variables
-    let { id } = req.params;
-    //find order by id
-    let order = await orderSchema.findOne({ order_id: id });
+    let token = req.user;
+    let { orderid, customerid } = req.query;
+
+    // Add ID validation for both IDs
+    if (!orderid || !orderid.match(/^[0-9a-fA-F]{24}$/) || !customerid || !customerid.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).send({
+        success: false,
+        message: "Invalid ID format",
+        error: `orderid:${orderid}, customerid:${customerid}`
+      });
+    }
+
+    if(token.id !== customerid){
+      return res.status(403).send({ //check user
+        success: false,
+        message: "forbidden",
+        error: "permission denied.",
+      });
+    }
+    let order = await orderSchema.findById(orderid);
     if (!order) {
       return res.status(404).send({
         success: false,
         message: "id not found.",
-        error: `id:${id}`,
+        error: `id:${orderid}`,
       });
     }
     //find and save remember product stock
-    for (let i = 0; i < order.products.length; i++) {
-      let product = await productSchema.findOne({
-        name: order.products[i].name,
-      });
+    for (const element of order.products) {
+      let product = await productSchema.findById(element._id);
       if (!product) {
         return res.status(404).send({
           success: false,
           message: "id not found.",
-          error: `id:${id}`,
+          error: `id:${element._id}`,
         });
       }
-      let product_id = product.product_id;
-      let product_remain = order.products[i].amount + product.remain;
-      await productSchema.findOneAndUpdate(
-        { product_id: product_id },
-        { remain: product_remain },
+      let product_id = product._id;
+      let product_remain = element.amount + product.stock;
+      await productSchema.findByIdAndUpdate(
+        product_id,
+        { stock: product_remain },
         { new: true }
       );
     }
-    await orderSchema.findOneAndDelete({ order_id: id });
+    await orderSchema.findByIdAndDelete(orderid);
     return res.status(200).send({
       success: true,
       message: "delete success",
@@ -194,5 +314,4 @@ router.delete("/:id", async function (req, res, next) {
     });
   }
 });
-
 module.exports = router;

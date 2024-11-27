@@ -1,7 +1,7 @@
-var express = require("express");
-var router = express.Router();
+const express = require("express");
+const router = express.Router();
 const bcrypt = require("bcrypt");
-var userSchema = require("../models/user.model");
+const userSchema = require("../models/user.model");
 const jwt = require("jsonwebtoken");
 
 router.get("/login", async function (req, res, next) {
@@ -26,7 +26,7 @@ router.get("/login", async function (req, res, next) {
         tokenPayload,
         process.env.JWT_KEY //|| "default_secret_key",
         ,{
-          expiresIn: "24h", // Token expires in 1 hour
+          expiresIn: "3h", // Token expires in 1 hour
         }
       );
       return res.status(202).send({
